@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipe Profile Plotter</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;font-size:14px;background:#f0f4f8}
+
+/* ── Setup ── */
+#setup-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:#1a3a5c}
+.card{background:#fff;border-radius:10px;padding:36px;width:460px;box-shadow:0 6px 32px rgba(0,0,0,.35)}
+.card h1{font-size:22px;color:#1a3a5c;margin-bottom:6px}
+.card p{color:#666;margin-bottom:24px;line-height:1.5}
+.fg{margin-bottom:16px}
+.fg label{display:block;font-weight:600;margin-bottom:5px;font-size:13px;color:#333}
+.fg input[type=number],.fg select{width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:5px;font-size:14px}
+.chk-row{display:flex;flex-wrap:wrap;gap:16px}
+.chk-row label{display:flex;align-items:center;gap:6px;font-weight:normal;cursor:pointer}
+.btn-go{width:100%;padding:11px;background:#1a3a5c;color:#fff;border:none;border-radius:5px;font-size:15px;cursor:pointer;margin-top:8px;font-weight:600}
+.btn-go:hover{background:#254d7a}
+
+/* ── Main ── */
+#main-screen{display:flex;flex-direction:column;height:100vh}
+header{background:#1a3a5c;color:#fff;padding:7px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+header h1{font-size:15px;font-weight:700;letter-spacing:.3px}
+.hctl{display:flex;gap:10px;align-items:center}
+.utog{display:flex;border:1px solid rgba(255,255,255,.35);border-radius:4px;overflow:hidden}
+.utog button{padding:3px 11px;border:none;cursor:pointer;font-size:12px;background:transparent;color:rgba(255,255,255,.65)}
+.utog button.on{background:rgba(255,255,255,.2);color:#fff}
+.hbtn{padding:3px 11px;border:1px solid rgba(255,255,255,.35);border-radius:4px;background:transparent;color:#fff;cursor:pointer;font-size:12px}
+.hbtn:hover{background:rgba(255,255,255,.1)}
+.exp-wrap{position:relative}
+.exp-dd{position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid #c8d4df;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.15);min-width:170px;z-index:100;overflow:hidden}
+.exp-dd button{display:block;width:100%;padding:9px 14px;border:none;background:transparent;text-align:left;cursor:pointer;font-size:13px;color:#222;border-bottom:1px solid #eef0f3}
+.exp-dd button:last-child{border-bottom:none}
+.exp-dd button:hover{background:#f0f4f8}
+.exp-dd .exp-sep{padding:5px 14px;font-size:11px;color:#999;font-weight:600;text-transform:uppercase;background:#f5f7fa;border-bottom:1px solid #eef0f3}
+
+#drawing-container{flex:0 0 auto;height:46vh;background:#fff;border-bottom:2px solid #d0d8e0}
+#profile-svg{width:100%;height:100%;display:block}
+
+#data-panel{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#fff}
+.tabs{display:flex;background:#eaeff4;border-bottom:1px solid #c8d4df;flex-shrink:0}
+.tabs button{padding:8px 15px;border:none;background:transparent;cursor:pointer;font-size:13px;border-bottom:3px solid transparent;color:#555}
+.tabs button.on{background:#fff;border-bottom-color:#1a3a5c;font-weight:700;color:#1a3a5c}
+#tab-body{flex:1;overflow:auto}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f5f7fa;position:sticky;top:0;padding:6px 10px;text-align:left;border-bottom:2px solid #c8d4df;white-space:nowrap;z-index:1;color:#333}
+td{padding:3px 8px;border-bottom:1px solid #eef0f3;vertical-align:middle}
+tr:hover td{background:#f9fbfd}
+td input[type=number],td input[type=text]{width:100%;border:1px solid transparent;padding:3px 5px;background:transparent;font-size:13px;border-radius:3px;color:inherit}
+td input:focus{outline:none;border-color:#1a3a5c;background:#fff}
+.ro{color:#666;font-size:12px}
+.lbl{font-weight:700;color:#1a3a5c;white-space:nowrap}
+.empty{text-align:center;color:#aaa;padding:20px}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════ SETUP ═══════════════════════ -->
+<div id="setup-screen">
+  <div class="card">
+    <h1>Pipe Profile Plotter</h1>
+    <p>Answer a few questions to generate an interactive pipe profile drawing.</p>
+
+    <div class="fg">
+      <label>Number of pipe segments</label>
+      <input type="number" id="s-pipes" value="3" min="1" max="20">
+    </div>
+    <div class="fg">
+      <label>Number of street crossings</label>
+      <input type="number" id="s-streets" value="2" min="0" max="10">
+    </div>
+    <div class="fg">
+      <label>Units</label>
+      <select id="s-units">
+        <option value="imp">Imperial (ft, in)</option>
+        <option value="met">Metric (m, mm)</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Optional drawing elements</label>
+      <div class="chk-row">
+        <label><input type="checkbox" id="s-gnd" checked> Ground elevation</label>
+        <label><input type="checkbox" id="s-bsmt"> Basements</label>
+        <label><input type="checkbox" id="s-hgl"> HGL</label>
+      </div>
+    </div>
+
+    <button class="btn-go" onclick="boot()">Generate Profile →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════ MAIN ════════════════════════ -->
+<div id="main-screen" style="display:none">
+  <header>
+    <h1>Pipe Profile Plotter</h1>
+    <div class="hctl">
+      <div class="utog">
+        <button id="u-imp" onclick="setUnits('imp')">Imperial</button>
+        <button id="u-met" onclick="setUnits('met')">Metric</button>
+      </div>
+      <div class="exp-wrap">
+        <button class="hbtn" onclick="toggleExp(event)">Export ▾</button>
+        <div class="exp-dd" id="exp-dd" hidden>
+          <div class="exp-sep">Download as…</div>
+          <button onclick="doExport('pptx')">&#128190; PowerPoint (.pptx)</button>
+          <button onclick="doExport('png')">&#128444; PNG Image</button>
+          <button onclick="doExport('svg')">&#128396; SVG Vector</button>
+        </div>
+      </div>
+      <button class="hbtn" onclick="goSetup()">New Profile</button>
+    </div>
+  </header>
+
+  <div id="drawing-container">
+    <svg id="profile-svg"></svg>
+  </div>
+
+  <div id="data-panel">
+    <div class="tabs" id="tabs"></div>
+    <div id="tab-body"></div>
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+const S = {
+  units:'imp', showGnd:true, showBsmt:false, showHGL:false,
+  mh:[],     // {name, rim, inv}
+  pipe:[],   // {len, dia, mat}
+  street:[], // {name, sta}
+  gnd:[],    // {elev}  – index matches mh index
+  hgl:[],    // {elev}
+  bsmt:[],   // {elev}
+};
+let activeTab = 'mh';
+
+// ─── Unit helpers ─────────────────────────────────────────────────────────────
+const U = {
+  isImp:()=>S.units==='imp',
+  eu:()=>S.units==='imp'?'ft':'m',
+  lu:()=>S.units==='imp'?'ft':'m',
+  du:()=>S.units==='imp'?'in':'mm',
+  defElev:()=>S.units==='imp'?100.0:30.0,
+  defLen:()=>S.units==='imp'?300:100,
+  defDia:()=>S.units==='imp'?8:200,
+  rimOff:()=>S.units==='imp'?5.0:1.5,
+  gndOff:()=>S.units==='imp'?2.0:0.6,
+  slope:()=>0.003,
+  fmt:(v,d=2)=>v==null||isNaN(+v)?'—':(+v).toFixed(d),
+};
+
+// ─── Station helpers ──────────────────────────────────────────────────────────
+function sta(i){let s=0;for(let k=0;k<i;k++)s+=+(S.pipe[k]?.len||0);return s}
+function totalLen(){return S.pipe.reduce((s,p)=>s+(+p.len||0),0)}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+function boot(){
+  const nPipe=Math.max(1,Math.min(20,+document.getElementById('s-pipes').value||3));
+  const nSt=Math.max(0,Math.min(10,+document.getElementById('s-streets').value||0));
+  S.units=document.getElementById('s-units').value;
+  S.showGnd=document.getElementById('s-gnd').checked;
+  S.showBsmt=document.getElementById('s-bsmt').checked;
+  S.showHGL=document.getElementById('s-hgl').checked;
+
+  const nMH=nPipe+1, e0=U.defElev(), sl=U.slope(), len=U.defLen();
+  const ro=U.rimOff(), go=U.gndOff();
+
+  S.mh=Array.from({length:nMH},(_,i)=>{
+    const inv=+(e0-i*sl*len).toFixed(3);
+    return{name:`MH-${i+1}`,rim:+(inv+ro).toFixed(3),inv};
+  });
+  S.pipe=Array.from({length:nPipe},()=>({len:len,dia:U.defDia(),mat:'PVC'}));
+  S.street=Array.from({length:nSt},(_,i)=>{
+    const s=Math.round(((i+1)/(nSt+1))*nPipe*len);
+    return{name:`Street ${i+1}`,sta:s};
+  });
+  S.gnd=S.mh.map(m=>({elev:+(m.rim+go).toFixed(3)}));
+  S.hgl=S.mh.map(m=>({elev:+(m.inv+ro*0.5).toFixed(3)}));
+  S.bsmt=S.mh.map(m=>({elev:+(m.rim-ro*0.4).toFixed(3)}));
+
+  document.getElementById('setup-screen').style.display='none';
+  document.getElementById('main-screen').style.display='flex';
+  document.getElementById('u-'+S.units).classList.add('on');
+  buildTabs(); showTab(activeTab); redraw();
+  window.addEventListener('resize',redraw);
+}
+
+function goSetup(){
+  window.removeEventListener('resize',redraw);
+  document.getElementById('main-screen').style.display='none';
+  document.getElementById('setup-screen').style.display='flex';
+}
+
+// ─── Drawing ──────────────────────────────────────────────────────────────────
+const M={t:60,r:32,b:46,l:76};
+
+function redraw(){
+  const svg=document.getElementById('profile-svg');
+  svg.innerHTML='';
+  const W=svg.clientWidth, H=svg.clientHeight;
+  if(W<40||H<40)return;
+  const pw=W-M.l-M.r, ph=H-M.t-M.b;
+  const tl=totalLen()||1;
+
+  // Gather all elevations to set bounds
+  const ev=[];
+  S.mh.forEach(m=>{ev.push(m.rim,m.inv)});
+  if(S.showGnd) S.gnd.forEach(g=>ev.push(g.elev));
+  if(S.showHGL) S.hgl.forEach(h=>ev.push(h.elev));
+  if(S.showBsmt) S.bsmt.forEach(b=>ev.push(b.elev));
+  let emin=Math.min(...ev), emax=Math.max(...ev);
+  const er=emax-emin||5;
+  emin-=er*0.12; emax+=er*0.18;
+
+  const tx=s=>M.l+s/tl*pw;
+  const ty=e=>M.t+(1-(e-emin)/(emax-emin))*ph;
+
+  function mk(tag,a={},txt){
+    const el=document.createElementNS('http://www.w3.org/2000/svg',tag);
+    Object.entries(a).forEach(([k,v])=>el.setAttribute(k,v));
+    if(txt!==undefined)el.textContent=txt;
+    return el;
+  }
+
+  // Defs + clip
+  const defs=mk('defs');
+  const cp=mk('clipPath',{id:'cp'});
+  cp.appendChild(mk('rect',{x:M.l,y:M.t,width:pw,height:ph}));
+  defs.appendChild(cp); svg.appendChild(defs);
+
+  // Background
+  svg.appendChild(mk('rect',{x:0,y:0,width:W,height:H,fill:'#fafbfc'}));
+  svg.appendChild(mk('rect',{x:M.l,y:M.t,width:pw,height:ph,fill:'#fff',stroke:'#c8d4df','stroke-width':1}));
+
+  const gc=mk('g',{'clip-path':'url(#cp)'});
+  const gl=mk('g'); // labels (unclipped)
+  svg.appendChild(gc); svg.appendChild(gl);
+
+  // Grid lines
+  const gs=niceStep(er/5);
+  const g0=Math.ceil(emin/gs)*gs;
+  for(let e=g0;e<=emax+0.0001;e+=gs){
+    const y=ty(e);
+    gc.appendChild(mk('line',{x1:M.l,y1:y,x2:M.l+pw,y2:y,stroke:'#e8ecf0','stroke-width':1}));
+    gl.appendChild(mk('text',{x:M.l-4,y:y+3.5,'text-anchor':'end','font-size':10,fill:'#888'},U.fmt(e)));
+  }
+
+  // Ground surface
+  if(S.showGnd && S.gnd.length>1){
+    const pts=S.gnd.map((g,i)=>`${tx(sta(i))},${ty(g.elev)}`).join(' ');
+    // Fill below ground
+    const fi=[
+      `${tx(sta(0))},${M.t+ph}`,
+      ...S.gnd.map((g,i)=>`${tx(sta(i))},${ty(g.elev)}`),
+      `${tx(sta(S.gnd.length-1))},${M.t+ph}`
+    ].join(' ');
+    gc.appendChild(mk('polygon',{points:fi,fill:'rgba(100,140,70,.09)',stroke:'none'}));
+    gc.appendChild(mk('polyline',{points:pts,fill:'none',stroke:'#5a8a3c','stroke-width':2,'stroke-dasharray':'7 3'}));
+    // Ground label
+    gl.appendChild(mk('text',{x:M.l+4,y:ty(S.gnd[0].elev)-4,'font-size':9,fill:'#5a8a3c'},'GND'));
+  }
+
+  // Street crossings
+  S.street.forEach(st=>{
+    if(!st.name)return;
+    const x=tx(+st.sta||0);
+    gc.appendChild(mk('line',{x1:x,y1:M.t,x2:x,y2:M.t+ph,stroke:'#b07020','stroke-width':1.5,'stroke-dasharray':'9 4'}));
+    gl.appendChild(mk('text',{x,y:M.t-5,'text-anchor':'middle','font-size':10,fill:'#b07020','font-weight':'700'},st.name));
+  });
+
+  // Basements
+  if(S.showBsmt){
+    S.bsmt.forEach((b,i)=>{
+      const x=tx(sta(i)), y=ty(b.elev);
+      gc.appendChild(mk('rect',{x:x-16,y:y-6,width:32,height:12,fill:'#fff3e0',stroke:'#e65100','stroke-width':1,rx:2}));
+      gc.appendChild(mk('text',{x,y:y+4,'text-anchor':'middle','font-size':9,fill:'#e65100'},U.fmt(b.elev)));
+    });
+    // legend
+    gl.appendChild(mk('text',{x:M.l+4,y:M.t+ph-4,'font-size':9,fill:'#e65100'},'BSMT'));
+  }
+
+  // HGL
+  if(S.showHGL && S.hgl.length>1){
+    const pts=S.hgl.map((h,i)=>`${tx(sta(i))},${ty(h.elev)}`).join(' ');
+    gc.appendChild(mk('polyline',{points:pts,fill:'none',stroke:'#1565c0','stroke-width':2,'stroke-dasharray':'10 4'}));
+    gl.appendChild(mk('text',{x:M.l+4,y:ty(S.hgl[0].elev)-4,'font-size':9,fill:'#1565c0'},'HGL'));
+  }
+
+  // Pipes
+  S.pipe.forEach((p,i)=>{
+    const mu=S.mh[i], md=S.mh[i+1];
+    if(!mu||!md)return;
+    const x1=tx(sta(i)), x2=tx(sta(i+1));
+    const y1=ty(mu.inv), y2=ty(md.inv);
+    gc.appendChild(mk('line',{x1,y1,x2,y2,stroke:'#1a3a5c','stroke-width':5,'stroke-linecap':'square'}));
+
+    // Pipe label box
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    const slope=+p.len>0?((mu.inv-md.inv)/+p.len*100):0;
+    const line1=`${p.dia} ${U.du()} ${p.mat||''}`.trim();
+    const line2=`S=${slope>=0?'':'-'}${Math.abs(slope).toFixed(2)}%`;
+    const lw=Math.max(line1.length,line2.length)*5.6+8;
+    const lg=mk('g',{transform:`translate(${mx},${my-12})`});
+    lg.appendChild(mk('rect',{x:-lw/2,y:-12,width:lw,height:22,fill:'rgba(255,255,255,.88)',rx:2,stroke:'#c8d4df','stroke-width':.5}));
+    lg.appendChild(mk('text',{x:0,y:-2,'text-anchor':'middle','font-size':9,fill:'#1a3a5c'},line1));
+    lg.appendChild(mk('text',{x:0,y:8,'text-anchor':'middle','font-size':9,fill:'#555'},line2));
+    gc.appendChild(lg);
+  });
+
+  // Manholes
+  S.mh.forEach((m,i)=>{
+    const x=tx(sta(i)), yr=ty(m.rim), yi=ty(m.inv);
+    const mw=9;
+    // Shaft
+    gc.appendChild(mk('rect',{x:x-mw/2,y:yr,width:mw,height:Math.max(1,yi-yr),fill:'#cdd9e8',stroke:'#1a3a5c','stroke-width':1.5}));
+    // Rim cap
+    gc.appendChild(mk('line',{x1:x-mw*1.6,y1:yr,x2:x+mw*1.6,y2:yr,stroke:'#1a3a5c','stroke-width':3}));
+    // Name label
+    gl.appendChild(mk('text',{x,y:yr-17,'text-anchor':'middle','font-size':10,fill:'#1a3a5c','font-weight':'700'},m.name));
+    // Rim elev
+    gl.appendChild(mk('text',{x,y:yr-6,'text-anchor':'middle','font-size':9,fill:'#444'},U.fmt(m.rim)));
+    // Invert elev
+    gl.appendChild(mk('text',{x,y:yi+13,'text-anchor':'middle','font-size':9,fill:'#555'},U.fmt(m.inv)));
+  });
+
+  // Station axis
+  const ss=niceStep(tl/6);
+  for(let s=0;s<=tl+0.001;s+=ss){
+    const x=tx(s);
+    gl.appendChild(mk('line',{x1:x,y1:M.t+ph,x2:x,y2:M.t+ph+4,stroke:'#888','stroke-width':1}));
+    gl.appendChild(mk('text',{x,y:M.t+ph+14,'text-anchor':'middle','font-size':10,fill:'#666'},U.fmt(s,0)));
+  }
+
+  // Axis labels
+  gl.appendChild(mk('text',{x:M.l+pw/2,y:H-3,'text-anchor':'middle','font-size':11,fill:'#555'},`Station (${U.lu()})`));
+  const eal=mk('text',{x:11,y:M.t+ph/2,'text-anchor':'middle','font-size':11,fill:'#555',
+    transform:`rotate(-90,11,${M.t+ph/2})`},`Elevation (${U.eu()})`);
+  gl.appendChild(eal);
+}
+
+function niceStep(r){
+  const m=Math.pow(10,Math.floor(Math.log10(r||1)));
+  const f=r/m;
+  return f<1.5?m:f<3?2*m:f<7?5*m:10*m;
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+const TAB_DEF=[
+  {id:'mh',label:'Manholes'},
+  {id:'pipe',label:'Pipes'},
+  {id:'street',label:'Streets'},
+  {id:'gnd',label:'Ground Elev',flag:'showGnd'},
+  {id:'hgl',label:'HGL',flag:'showHGL'},
+  {id:'bsmt',label:'Basements',flag:'showBsmt'},
+];
+
+function buildTabs(){
+  const bar=document.getElementById('tabs');
+  bar.innerHTML='';
+  TAB_DEF.filter(t=>!t.flag||S[t.flag]).forEach(t=>{
+    const b=document.createElement('button');
+    b.textContent=t.label; b.dataset.id=t.id;
+    if(t.id===activeTab)b.classList.add('on');
+    b.onclick=()=>showTab(t.id);
+    bar.appendChild(b);
+  });
+  // If active tab is no longer visible, switch to first
+  if(!TAB_DEF.find(t=>t.id===activeTab&&(!t.flag||S[t.flag]))){
+    activeTab='mh';
+    bar.querySelector('button').classList.add('on');
+  }
+}
+
+function showTab(id){
+  activeTab=id;
+  document.querySelectorAll('#tabs button').forEach(b=>{
+    b.classList.toggle('on',b.dataset.id===id);
+  });
+  const body=document.getElementById('tab-body');
+  const renderers={mh:tblMH,pipe:tblPipe,street:tblStreet,gnd:tblGnd,hgl:tblHGL,bsmt:tblBsmt};
+  body.innerHTML=(renderers[id]||tblMH)();
+}
+
+// ─── Input builders ───────────────────────────────────────────────────────────
+function ni(val,fn,d=2){
+  const v=val==null||isNaN(+val)?'': (+val).toFixed(d);
+  return `<input type="number" step="any" value="${v}" oninput="(${fn})(+this.value)">`;
+}
+function ti(val,fn){
+  const v=String(val??'').replace(/"/g,'&quot;');
+  return `<input type="text" value="${v}" oninput="(${fn})(this.value)">`;
+}
+
+// ─── Manhole table ────────────────────────────────────────────────────────────
+function tblMH(){
+  const eu=U.eu(),lu=U.lu();
+  let h=`<table><thead><tr>
+    <th>MH</th><th>Name</th>
+    <th>Rim (${eu})</th><th>Invert (${eu})</th>
+    <th>Depth (${eu})</th><th>Station (${lu})</th>
+  </tr></thead><tbody>`;
+  S.mh.forEach((m,i)=>{
+    const dep=((+m.rim||0)-(+m.inv||0)).toFixed(2);
+    h+=`<tr>
+      <td class="lbl">MH-${i+1}</td>
+      <td>${ti(m.name,`v=>{S.mh[${i}].name=v;redraw()}`)}</td>
+      <td>${ni(m.rim,`v=>{S.mh[${i}].rim=v;updDepth(${i});redraw()}`)}</td>
+      <td>${ni(m.inv,`v=>{S.mh[${i}].inv=v;updDepth(${i});updSlope(${i-1});updSlope(${i});redraw()}`)}</td>
+      <td class="ro" id="dep-${i}">${dep}</td>
+      <td class="ro">${U.fmt(sta(i),2)}</td>
+    </tr>`;
+  });
+  return h+'</tbody></table>';
+}
+
+function updDepth(i){
+  const c=document.getElementById('dep-'+i);
+  if(c)c.textContent=((+S.mh[i].rim||0)-(+S.mh[i].inv||0)).toFixed(2);
+}
+function updSlope(i){
+  const c=document.getElementById('sl-'+i);
+  if(!c)return;
+  const p=S.pipe[i],mu=S.mh[i],md=S.mh[i+1];
+  if(p&&mu&&md&&+p.len>0)c.textContent=((mu.inv-md.inv)/+p.len*100).toFixed(3);
+}
+
+// ─── Pipe table ───────────────────────────────────────────────────────────────
+function tblPipe(){
+  const eu=U.eu(),lu=U.lu(),du=U.du();
+  let h=`<table><thead><tr>
+    <th>Pipe</th><th>From → To</th>
+    <th>Length (${lu})</th><th>Dia (${du})</th><th>Material</th>
+    <th>Up Inv (${eu})</th><th>Dn Inv (${eu})</th><th>Slope (%)</th>
+  </tr></thead><tbody>`;
+  S.pipe.forEach((p,i)=>{
+    const mu=S.mh[i],md=S.mh[i+1];
+    const sl=+p.len>0&&mu&&md?(((+mu.inv||0)-(+md.inv||0))/(+p.len)*100).toFixed(3):'—';
+    h+=`<tr>
+      <td class="lbl">P-${i+1}</td>
+      <td class="ro">${esc(mu?.name||'MH-'+(i+1))} → ${esc(md?.name||'MH-'+(i+2))}</td>
+      <td>${ni(p.len,`v=>{S.pipe[${i}].len=v;redraw()}`,0)}</td>
+      <td>${ni(p.dia,`v=>{S.pipe[${i}].dia=v;redraw()}`,0)}</td>
+      <td>${ti(p.mat,`v=>{S.pipe[${i}].mat=v;redraw()}`)}</td>
+      <td>${ni(mu?.inv,`v=>{S.mh[${i}].inv=v;updDepth(${i});updSlope(${i});redraw()}`)}</td>
+      <td>${ni(md?.inv,`v=>{S.mh[${i+1}].inv=v;updDepth(${i+1});updSlope(${i});redraw()}`)}</td>
+      <td class="ro" id="sl-${i}">${sl}</td>
+    </tr>`;
+  });
+  return h+'</tbody></table>';
+}
+
+// ─── Street table ─────────────────────────────────────────────────────────────
+function tblStreet(){
+  if(!S.street.length)return'<p class="empty">No streets configured. Start a new profile to add streets.</p>';
+  const lu=U.lu();
+  let h=`<table><thead><tr><th>#</th><th>Name</th><th>Station (${lu})</th></tr></thead><tbody>`;
+  S.street.forEach((st,i)=>{
+    h+=`<tr>
+      <td class="ro">${i+1}</td>
+      <td>${ti(st.name,`v=>{S.street[${i}].name=v;redraw()}`)}</td>
+      <td>${ni(st.sta,`v=>{S.street[${i}].sta=v;redraw()}`,0)}</td>
+    </tr>`;
+  });
+  return h+'</tbody></table>';
+}
+
+// ─── Ground table ─────────────────────────────────────────────────────────────
+function tblGnd(){
+  const eu=U.eu(),lu=U.lu();
+  let h=`<table><thead><tr>
+    <th>At MH</th><th>Station (${lu})</th><th>Ground Elev (${eu})</th>
+  </tr></thead><tbody>`;
+  S.gnd.forEach((g,i)=>{
+    h+=`<tr>
+      <td class="lbl">${esc(S.mh[i]?.name||'MH-'+(i+1))}</td>
+      <td class="ro">${U.fmt(sta(i),2)}</td>
+      <td>${ni(g.elev,`v=>{S.gnd[${i}].elev=v;redraw()}`)}</td>
+    </tr>`;
+  });
+  return h+'</tbody></table>';
+}
+
+// ─── HGL table ────────────────────────────────────────────────────────────────
+function tblHGL(){
+  const eu=U.eu();
+  let h=`<table><thead><tr><th>MH</th><th>Name</th><th>HGL Elev (${eu})</th></tr></thead><tbody>`;
+  S.hgl.forEach((h2,i)=>{
+    h+=`<tr>
+      <td class="lbl">MH-${i+1}</td>
+      <td class="ro">${esc(S.mh[i]?.name||'')}</td>
+      <td>${ni(h2.elev,`v=>{S.hgl[${i}].elev=v;redraw()}`)}</td>
+    </tr>`;
+  });
+  return h+'</tbody></table>';
+}
+
+// ─── Basement table ───────────────────────────────────────────────────────────
+function tblBsmt(){
+  const eu=U.eu();
+  let h=`<table><thead><tr><th>MH</th><th>Name</th><th>Basement Elev (${eu})</th></tr></thead><tbody>`;
+  S.bsmt.forEach((b,i)=>{
+    h+=`<tr>
+      <td class="lbl">MH-${i+1}</td>
+      <td class="ro">${esc(S.mh[i]?.name||'')}</td>
+      <td>${ni(b.elev,`v=>{S.bsmt[${i}].elev=v;redraw()}`)}</td>
+    </tr>`;
+  });
+  return h+'</tbody></table>';
+}
+
+// ─── Units toggle ─────────────────────────────────────────────────────────────
+function setUnits(u){
+  S.units=u;
+  document.getElementById('u-imp').classList.toggle('on',u==='imp');
+  document.getElementById('u-met').classList.toggle('on',u==='met');
+  showTab(activeTab); redraw();
+}
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+function toggleExp(e){
+  e.stopPropagation();
+  const dd=document.getElementById('exp-dd');
+  dd.hidden=!dd.hidden;
+  if(!dd.hidden){
+    function close(ev){
+      if(!ev.target.closest('.exp-wrap')){dd.hidden=true;document.removeEventListener('click',close)}
+    }
+    document.addEventListener('click',close);
+  }
+}
+
+async function svgToPNG(scale=2){
+  const svg=document.getElementById('profile-svg');
+  const W=svg.clientWidth, H=svg.clientHeight;
+  const raw=new XMLSerializer().serializeToString(svg);
+  // Embed font-family fallback so text renders in canvas
+  const svgBlob=new Blob([raw],{type:'image/svg+xml;charset=utf-8'});
+  const url=URL.createObjectURL(svgBlob);
+  const canvas=document.createElement('canvas');
+  canvas.width=W*scale; canvas.height=H*scale;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.scale(scale,scale);
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    img.onload=()=>{ctx.drawImage(img,0,0,W,H);URL.revokeObjectURL(url);res({dataUrl:canvas.toDataURL('image/png'),W,H})};
+    img.onerror=(err)=>{URL.revokeObjectURL(url);rej(err)};
+    img.src=url;
+  });
+}
+
+async function doExport(type){
+  document.getElementById('exp-dd').hidden=true;
+
+  if(type==='svg'){
+    const svg=document.getElementById('profile-svg');
+    const data=new XMLSerializer().serializeToString(svg);
+    dlBlob(new Blob([data],{type:'image/svg+xml'}),'pipe-profile.svg');
+    return;
+  }
+
+  let pngResult;
+  try{pngResult=await svgToPNG(type==='pptx'?3:2)}
+  catch(e){alert('Export failed: '+e.message);return}
+  const {dataUrl,W,H}=pngResult;
+
+  if(type==='png'){
+    const a=document.createElement('a');
+    a.href=dataUrl; a.download='pipe-profile.png'; a.click();
+    return;
+  }
+
+  if(type==='pptx'){
+    if(typeof PptxGenJS==='undefined'){
+      alert('PptxGenJS library not loaded.\nCheck your internet connection and reload the page.');
+      return;
+    }
+    const prs=new PptxGenJS();
+    prs.layout='LAYOUT_WIDE'; // 13.33" x 7.5"
+    const slide=prs.addSlide();
+    slide.background={color:'FFFFFF'};
+    // Fit image into slide maintaining aspect ratio
+    const sw=13.33, sh=7.5, pad=0.25;
+    const aw=sw-pad*2, ah=sh-pad*2;
+    const ar=W/H, sar=aw/ah;
+    let iw,ih;
+    if(ar>sar){iw=aw;ih=iw/ar}else{ih=ah;iw=ih*ar}
+    slide.addImage({data:dataUrl, x:pad+(aw-iw)/2, y:pad+(ah-ih)/2, w:iw, h:ih});
+    await prs.writeFile({fileName:'pipe-profile.pptx'});
+  }
+}
+
+function dlBlob(blob,name){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+</body>
+</html>
