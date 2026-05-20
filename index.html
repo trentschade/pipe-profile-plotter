@@ -176,10 +176,10 @@ function boot(){
   });
   S.pipe=Array.from({length:nPipe},()=>({len:len,dia:U.defDia(),mat:'PVC'}));
   S.street=Array.from({length:nSt},(_,i)=>{
-    const s=Math.round(((i+1)/(nSt+1))*nPipe*len);
+    const s=Math.round((i/nSt)*nPipe*len);
     return{name:`Street ${i+1}`,sta:s};
   });
-  S.gnd=S.mh.map(m=>({elev:+(m.rim+go).toFixed(3)}));
+  S.gnd=S.mh.map(m=>({elev:+m.rim.toFixed(3)}));
   S.hgl=S.mh.map(m=>({elev:+(m.inv+ro*0.5).toFixed(3)}));
   S.bsmt=S.mh.map(m=>({elev:+(m.rim-ro*0.4).toFixed(3)}));
 
