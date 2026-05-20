@@ -176,7 +176,7 @@ function boot(){
   });
   S.pipe=Array.from({length:nPipe},()=>({len:len,dia:U.defDia(),mat:'PVC'}));
   S.street=Array.from({length:nSt},(_,i)=>{
-    const s=Math.round(((i+1)/(nSt+1))*nPipe*len);
+    const s=nSt>1?Math.round((i/(nSt-1))*nPipe*len):0;
     return{name:`Street ${i+1}`,sta:s};
   });
   S.gnd=S.mh.map(m=>({elev:+m.rim.toFixed(3)}));
