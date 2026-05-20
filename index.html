@@ -319,7 +319,7 @@ function redraw(){
     // Shaft
     gc.appendChild(mk('rect',{x:x-mw/2,y:yr,width:mw,height:Math.max(1,yi-yr),fill:'#cdd9e8',stroke:'#1a3a5c','stroke-width':1.5}));
     // Rim cap
-    gc.appendChild(mk('line',{x1:x-mw*1.6,y1:yr,x2:x+mw*1.6,y2:yr,stroke:'#1a3a5c','stroke-width':3}));
+    gc.appendChild(mk('line',{x1:x-mw/2,y1:yr,x2:x+mw/2,y2:yr,stroke:'#1a3a5c','stroke-width':3}));
     // Name label
     gl.appendChild(mk('text',{x,y:yr-17,'text-anchor':'middle','font-size':10,fill:'#1a3a5c','font-weight':'700'},m.name));
     // Rim elev
