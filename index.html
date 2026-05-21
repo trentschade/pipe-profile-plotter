@@ -197,7 +197,7 @@ function goSetup(){
 }
 
 // ─── Drawing ──────────────────────────────────────────────────────────────────
-const M={t:60,r:32,b:46,l:76};
+const M={t:20,r:32,b:46,l:76};
 
 function redraw(){
   const svg=document.getElementById('profile-svg');
@@ -217,7 +217,8 @@ function redraw(){
   const er=emax-emin||5;
   emin-=er*0.12; emax+=er*0.18;
 
-  const tx=s=>M.l+s/tl*pw;
+  const pad=tl*0.06, smin=-pad, smax=tl+pad;
+  const tx=s=>M.l+(s-smin)/(smax-smin)*pw;
   const ty=e=>M.t+(1-(e-emin)/(emax-emin))*ph;
 
   function mk(tag,a={},txt){
@@ -262,7 +263,7 @@ function redraw(){
     gc.appendChild(mk('polygon',{points:fi,fill:'rgba(100,140,70,.09)',stroke:'none'}));
     gc.appendChild(mk('polyline',{points:pts,fill:'none',stroke:'#5a8a3c','stroke-width':2,'stroke-dasharray':'7 3'}));
     // Ground label
-    gl.appendChild(mk('text',{x:M.l+4,y:ty(S.gnd[0].elev)-4,'font-size':9,fill:'#5a8a3c'},'GND'));
+    gl.appendChild(mk('text',{x:tx(sta(0))+6,y:ty(S.gnd[0].elev)+10,'font-size':9,fill:'#5a8a3c'},'GND'));
   }
 
   // Street crossings
