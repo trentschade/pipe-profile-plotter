@@ -217,7 +217,8 @@ function redraw(){
   const er=emax-emin||5;
   emin-=er*0.12; emax+=er*0.18;
 
-  const tx=s=>M.l+s/tl*pw;
+  const pad=tl*0.06, smin=-pad, smax=tl+pad;
+  const tx=s=>M.l+(s-smin)/(smax-smin)*pw;
   const ty=e=>M.t+(1-(e-emin)/(emax-emin))*ph;
 
   function mk(tag,a={},txt){
