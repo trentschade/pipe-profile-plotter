@@ -298,7 +298,8 @@ function redraw(){
     if(!mu||!md)return;
     const x1=tx(sta(i)), x2=tx(sta(i+1));
     const y1=ty(mu.inv), y2=ty(md.inv);
-    gc.appendChild(mk('line',{x1,y1,x2,y2,stroke:'#1a3a5c','stroke-width':5,'stroke-linecap':'square'}));
+    gc.appendChild(mk('line',{x1,y1,x2,y2,stroke:'#1a3a5c','stroke-width':1,'stroke-linecap':'butt'}));
+    // gc.appendChild(mk('line',{x1,y1,x2,y2,stroke:'#1a3a5c','stroke-width':1,'stroke-linecap':'butt'}));
 
     // Pipe label box
     const mx=(x1+x2)/2, my=(y1+y2)/2;
