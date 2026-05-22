@@ -75,6 +75,10 @@ td input:focus{outline:none;border-color:#1a3a5c;background:#fff}
       <input type="number" id="s-streets" value="2" min="0" max="10">
     </div>
     <div class="fg">
+      <label>Number of basements</label>
+      <input type="number" id="s-bsmt" value="0" min="0" max="20">
+    </div>
+    <div class="fg">
       <label>Units</label>
       <select id="s-units">
         <option value="imp">Imperial (ft, in)</option>
@@ -85,7 +89,6 @@ td input:focus{outline:none;border-color:#1a3a5c;background:#fff}
       <label>Optional drawing elements</label>
       <div class="chk-row">
         <label><input type="checkbox" id="s-gnd" checked> Ground elevation</label>
-        <label><input type="checkbox" id="s-bsmt"> Basements</label>
         <label><input type="checkbox" id="s-hgl"> HGL</label>
       </div>
     </div>
@@ -151,6 +154,8 @@ const U = {
   rimOff:()=>S.units==='imp'?5.0:1.5,
   gndOff:()=>S.units==='imp'?2.0:0.6,
   slope:()=>0.003,
+  bsmtAbove:()=>S.units==='imp'?3.0:1.0,
+  bsmtDepth:()=>S.units==='imp'?8.0:2.5,
   fmt:(v,d=2)=>v==null||isNaN(+v)?'—':(+v).toFixed(d),
 };
 
@@ -162,9 +167,10 @@ function totalLen(){return S.pipe.reduce((s,p)=>s+(+p.len||0),0)}
 function boot(){
   const nPipe=Math.max(1,Math.min(20,+document.getElementById('s-pipes').value||3));
   const nSt=Math.max(0,Math.min(10,+document.getElementById('s-streets').value||0));
+  const nBsmt=Math.max(0,Math.min(20,+document.getElementById('s-bsmt').value||0));
   S.units=document.getElementById('s-units').value;
   S.showGnd=document.getElementById('s-gnd').checked;
-  S.showBsmt=document.getElementById('s-bsmt').checked;
+  S.showBsmt=nBsmt>0;
   S.showHGL=document.getElementById('s-hgl').checked;
 
   const nMH=nPipe+1, e0=U.defElev(), sl=U.slope(), len=U.defLen();
@@ -181,7 +187,10 @@ function boot(){
   });
   S.gnd=S.mh.map(m=>({elev:+m.rim.toFixed(3)}));
   S.hgl=S.mh.map(m=>({elev:+(m.inv+ro*0.5).toFixed(3)}));
-  S.bsmt=S.mh.map(m=>({elev:+(m.rim-ro*0.4).toFixed(3)}));
+  S.bsmt=Array.from({length:nBsmt},(_,i)=>{
+    const s=Math.round(((i+0.5)/nBsmt)*nPipe*len);
+    return{name:`House ${i+1}`,sta:s};
+  });
 
   document.getElementById('setup-screen').style.display='none';
   document.getElementById('main-screen').style.display='flex';
@@ -197,6 +206,17 @@ function goSetup(){
 }
 
 // ─── Drawing ──────────────────────────────────────────────────────────────────
+function groundAtSta(s){
+  const src=S.showGnd&&S.gnd.length?S.gnd.map((g,i)=>({elev:g.elev,s:sta(i)}))
+                                    :S.mh.map((m,i)=>({elev:m.rim,s:sta(i)}));
+  for(let i=0;i<src.length-1;i++){
+    if(s>=src[i].s&&s<=src[i+1].s){
+      const t=(s-src[i].s)/(src[i+1].s-src[i].s);
+      return src[i].elev+t*(src[i+1].elev-src[i].elev);
+    }
+  }
+  return s<src[0].s?src[0].elev:src[src.length-1].elev;
+}
 const M={t:20,r:32,b:46,l:76};
 
 function redraw(){
@@ -212,7 +232,6 @@ function redraw(){
   S.mh.forEach(m=>{ev.push(m.rim,m.inv)});
   if(S.showGnd) S.gnd.forEach(g=>ev.push(g.elev));
   if(S.showHGL) S.hgl.forEach(h=>ev.push(h.elev));
-  if(S.showBsmt) S.bsmt.forEach(b=>ev.push(b.elev));
   let emin=Math.min(...ev), emax=Math.max(...ev);
   const er=emax-emin||5;
   emin-=er*0.12; emax+=er*0.18;
@@ -276,13 +295,19 @@ function redraw(){
 
   // Basements
   if(S.showBsmt){
-    S.bsmt.forEach((b,i)=>{
-      const x=tx(sta(i)), y=ty(b.elev);
-      gc.appendChild(mk('rect',{x:x-16,y:y-6,width:32,height:12,fill:'#fff3e0',stroke:'#e65100','stroke-width':1,rx:2}));
-      gc.appendChild(mk('text',{x,y:y+4,'text-anchor':'middle','font-size':9,fill:'#e65100'},U.fmt(b.elev)));
+    const above=U.bsmtAbove(), depth=U.bsmtDepth();
+    S.bsmt.forEach(b=>{
+      const x=tx(+b.sta||0);
+      const gElev=groundAtSta(+b.sta||0);
+      const houseBottomY=ty(gElev+above);
+      const lineEndY=ty(gElev+above-depth);
+      const hw=10, bh=8, rh=6;
+      // Dotted depth line (drawn first, beneath house)
+      gc.appendChild(mk('line',{x1:x,y1:houseBottomY,x2:x,y2:lineEndY,stroke:'#1a3a5c','stroke-width':1,'stroke-dasharray':'3 3'}));
+      // House icon
+      const d=`M ${x-hw} ${houseBottomY} L ${x-hw} ${houseBottomY-bh} L ${x} ${houseBottomY-bh-rh} L ${x+hw} ${houseBottomY-bh} L ${x+hw} ${houseBottomY} Z`;
+      gc.appendChild(mk('path',{d,fill:'#dce8f5',stroke:'#1a3a5c','stroke-width':2}));
     });
-    // legend
-    gl.appendChild(mk('text',{x:M.l+4,y:M.t+ph-4,'font-size':9,fill:'#e65100'},'BSMT'));
   }
 
   // HGL
@@ -507,13 +532,14 @@ function tblHGL(){
 
 // ─── Basement table ───────────────────────────────────────────────────────────
 function tblBsmt(){
-  const eu=U.eu();
-  let h=`<table><thead><tr><th>MH</th><th>Name</th><th>Basement Elev (${eu})</th></tr></thead><tbody>`;
+  if(!S.bsmt.length)return'<p class="empty">No basements configured. Start a new profile to add basements.</p>';
+  const lu=U.lu();
+  let h=`<table><thead><tr><th>#</th><th>Name</th><th>Station (${lu})</th></tr></thead><tbody>`;
   S.bsmt.forEach((b,i)=>{
     h+=`<tr>
-      <td class="lbl">MH-${i+1}</td>
-      <td class="ro">${esc(S.mh[i]?.name||'')}</td>
-      <td>${ni(b.elev,`v=>{S.bsmt[${i}].elev=v;redraw()}`)}</td>
+      <td class="ro">${i+1}</td>
+      <td>${ti(b.name,`v=>{S.bsmt[${i}].name=v;redraw()}`)}</td>
+      <td>${ni(b.sta,`v=>{S.bsmt[${i}].sta=v;redraw()}`,0)}</td>
     </tr>`;
   });
   return h+'</tbody></table>';
