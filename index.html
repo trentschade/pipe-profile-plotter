@@ -298,10 +298,11 @@ function redraw(){
     if(!mu||!md)return;
     const x1=tx(sta(i)), x2=tx(sta(i+1));
     const y1=ty(mu.inv), y2=ty(md.inv);
-    gc.appendChild(mk('line',{x1,y1,x2,y2,stroke:'#1a3a5c','stroke-width':1,'stroke-linecap':'butt'}));
     // Top of pipe line offset by diameter in elevation units
     const diaElev=U.isImp()?(+p.dia||0)/12:(+p.dia||0)/1000;
     const y1t=ty(mu.inv+diaElev), y2t=ty(md.inv+diaElev);
+    gc.appendChild(mk('polygon',{points:`${x1},${y1} ${x2},${y2} ${x2},${y2t} ${x1},${y1t}`,fill:'#cdd9e8',stroke:'none'}));
+    gc.appendChild(mk('line',{x1,y1,x2,y2,stroke:'#1a3a5c','stroke-width':1,'stroke-linecap':'butt'}));
     gc.appendChild(mk('line',{x1,y1:y1t,x2,y2:y2t,stroke:'#1a3a5c','stroke-width':1,'stroke-linecap':'butt'}));
 
     // Pipe label box
