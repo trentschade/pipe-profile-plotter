@@ -233,6 +233,7 @@ function redraw(){
   S.mh.forEach(m=>{ev.push(m.rim,m.inv)});
   if(S.showGnd) S.gnd.forEach(g=>ev.push(g.elev));
   if(S.showHGL) S.hgl.forEach(h=>ev.push(h.elev));
+  if(S.showBsmt) S.bsmt.forEach(b=>{ev.push(+b.elev||0);ev.push((+b.elev||0)-U.bsmtDepth())});
   let emin=Math.min(...ev), emax=Math.max(...ev);
   const er=emax-emin||5;
   emin-=er*0.12; emax+=er*0.18;
