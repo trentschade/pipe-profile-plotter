@@ -353,7 +353,7 @@ function redraw(){
     const line1=`${p.dia} ${U.du()} ${p.mat||''}`.trim();
     const line2=`S=${slope>=0?'':'-'}${Math.abs(slope).toFixed(2)}%`;
     const lw=Math.max(line1.length,line2.length)*5.6+8;
-    const lg=mk('g',{transform:`translate(${mx},${my-12})`});
+    const lg=mk('g',{transform:`translate(${mx},${M.t+ph-14})`});
     lg.appendChild(mk('rect',{x:-lw/2,y:-12,width:lw,height:22,fill:'rgba(255,255,255,.88)',rx:2,stroke:'#c8d4df','stroke-width':.5}));
     lg.appendChild(mk('text',{x:0,y:-2,'text-anchor':'middle','font-size':9,fill:'#1a3a5c'},line1));
     lg.appendChild(mk('text',{x:0,y:8,'text-anchor':'middle','font-size':9,fill:'#555'},line2));
