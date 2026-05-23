@@ -358,6 +358,8 @@ function redraw(){
       // House icon
       const d=`M ${x-hw} ${houseBottomY} L ${x-hw} ${houseBottomY-bh} L ${x} ${houseBottomY-bh-rh} L ${x+hw} ${houseBottomY-bh} L ${x+hw} ${houseBottomY} Z`;
       gc.appendChild(mk('path',{d,fill:'#dce8f5',stroke:'#1a3a5c','stroke-width':2}));
+      // House name label
+      gl.appendChild(mk('text',{x,y:houseBottomY+10,'text-anchor':'middle','font-size':9,fill:'#1a3a5c'},b.name));
     });
   }
 
