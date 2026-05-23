@@ -303,8 +303,8 @@ function redraw(){
       const houseBottomY=ty(+b.elev||0);
       const lineEndY=ty((+b.elev||0)-depth);
       const hw=10, bh=8, rh=6;
-      // Dotted depth line (drawn first, beneath house)
-      gc.appendChild(mk('line',{x1:x,y1:houseBottomY,x2:x,y2:lineEndY,stroke:'#1a3a5c','stroke-width':1,'stroke-dasharray':'3 3'}));
+      // Basement box (drawn first, beneath house)
+      gc.appendChild(mk('rect',{x:x-hw,y:houseBottomY,width:hw*2,height:lineEndY-houseBottomY,fill:'none',stroke:'#555','stroke-width':1,'stroke-dasharray':'4 3'}));
       // House icon
       const d=`M ${x-hw} ${houseBottomY} L ${x-hw} ${houseBottomY-bh} L ${x} ${houseBottomY-bh-rh} L ${x+hw} ${houseBottomY-bh} L ${x+hw} ${houseBottomY} Z`;
       gc.appendChild(mk('path',{d,fill:'#dce8f5',stroke:'#1a3a5c','stroke-width':2}));
