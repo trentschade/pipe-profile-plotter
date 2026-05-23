@@ -88,7 +88,7 @@ td input:focus{outline:none;border-color:#1a3a5c;background:#fff}
     <div class="fg">
       <label>Optional drawing elements</label>
       <div class="chk-row">
-        <label><input type="checkbox" id="s-gnd" checked> Ground elevation</label>
+        <label><input type="checkbox" id="s-gnd" checked> Street surface</label>
         <label><input type="checkbox" id="s-hgl"> HGL</label>
       </div>
     </div>
@@ -132,13 +132,14 @@ td input:focus{outline:none;border-color:#1a3a5c;background:#fff}
 <script>
 // ─── State ────────────────────────────────────────────────────────────────────
 const S = {
-  units:'imp', showGnd:true, showBsmt:false, showHGL:false,
-  mh:[],     // {name, rim, inv}
-  pipe:[],   // {len, dia, mat}
-  street:[], // {name, sta}
-  gnd:[],    // {elev}  – index matches mh index
-  hgl:[],    // {elev}
-  bsmt:[],   // {elev}
+  units:'imp', showGnd:true, showBsmt:false, showHGL:false, showGround:false,
+  mh:[],      // {name, rim, inv}
+  pipe:[],    // {len, dia, mat}
+  street:[],  // {name, sta}
+  gnd:[],     // street surface {sta, elev}
+  hgl:[],     // {elev}
+  bsmt:[],    // {name, sta, elev}
+  ground:[],  // ground spline {sta, elev}
 };
 let activeTab = 'mh';
 
@@ -185,7 +186,7 @@ function boot(){
     const s=Math.round((i/nSt)*nPipe*len);
     return{name:`Street ${i+1}`,sta:s};
   });
-  S.gnd=S.mh.map(m=>({elev:+m.rim.toFixed(3)}));
+  S.gnd=S.mh.map((m,i)=>({sta:sta(i),elev:+m.rim.toFixed(3)}));
   S.hgl=S.mh.map(m=>({elev:+(m.inv+ro*0.5).toFixed(3)}));
   S.bsmt=Array.from({length:nBsmt},(_,i)=>{
     const s=Math.round(((i+0.5)/nBsmt)*nPipe*len);
@@ -193,6 +194,9 @@ function boot(){
     const elev=+(groundAtSta(s)+randAbove).toFixed(3);
     return{name:`House ${i+1}`,sta:s,elev};
   });
+  S.showGround=nBsmt>0;
+  const gndOff=U.isImp()?3.0:1.0;
+  S.ground=S.bsmt.map(b=>({sta:+b.sta,elev:+(b.elev-gndOff).toFixed(3)}));
 
   document.getElementById('setup-screen').style.display='none';
   document.getElementById('main-screen').style.display='flex';
@@ -209,7 +213,7 @@ function goSetup(){
 
 // ─── Drawing ──────────────────────────────────────────────────────────────────
 function groundAtSta(s){
-  const src=S.showGnd&&S.gnd.length?S.gnd.map((g,i)=>({elev:g.elev,s:sta(i)}))
+  const src=S.showGnd&&S.gnd.length?[...S.gnd].sort((a,b)=>a.sta-b.sta).map(g=>({elev:g.elev,s:g.sta}))
                                     :S.mh.map((m,i)=>({elev:m.rim,s:sta(i)}));
   for(let i=0;i<src.length-1;i++){
     if(s>=src[i].s&&s<=src[i+1].s){
@@ -218,6 +222,20 @@ function groundAtSta(s){
     }
   }
   return s<src[0].s?src[0].elev:src[src.length-1].elev;
+}
+function catmullRomPath(pts,tx,ty){
+  if(pts.length<2)return'';
+  if(pts.length===2)return`M ${tx(pts[0].sta)} ${ty(pts[0].elev)} L ${tx(pts[1].sta)} ${ty(pts[1].elev)}`;
+  let d=`M ${tx(pts[0].sta)} ${ty(pts[0].elev)}`;
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[Math.max(0,i-1)],p1=pts[i],p2=pts[i+1],p3=pts[Math.min(pts.length-1,i+2)];
+    const c1x=tx(p1.sta)+(tx(p2.sta)-tx(p0.sta))/6;
+    const c1y=ty(p1.elev)+(ty(p2.elev)-ty(p0.elev))/6;
+    const c2x=tx(p2.sta)-(tx(p3.sta)-tx(p1.sta))/6;
+    const c2y=ty(p2.elev)-(ty(p3.elev)-ty(p1.elev))/6;
+    d+=` C ${c1x} ${c1y} ${c2x} ${c2y} ${tx(p2.sta)} ${ty(p2.elev)}`;
+  }
+  return d;
 }
 const M={t:20,r:32,b:46,l:76};
 
@@ -235,6 +253,7 @@ function redraw(){
   if(S.showGnd) S.gnd.forEach(g=>ev.push(g.elev));
   if(S.showHGL) S.hgl.forEach(h=>ev.push(h.elev));
   if(S.showBsmt) S.bsmt.forEach(b=>{ev.push(+b.elev||0);ev.push((+b.elev||0)-U.bsmtDepth())});
+  if(S.showGround) S.ground.forEach(g=>ev.push(g.elev));
   let emin=Math.min(...ev), emax=Math.max(...ev);
   const er=emax-emin||5;
   emin-=er*0.12; emax+=er*0.18;
@@ -273,19 +292,34 @@ function redraw(){
     gl.appendChild(mk('text',{x:M.l-4,y:y+3.5,'text-anchor':'end','font-size':10,fill:'#888'},U.fmt(e)));
   }
 
-  // Ground surface
+  // Street surface
   if(S.showGnd && S.gnd.length>1){
-    const pts=S.gnd.map((g,i)=>`${tx(sta(i))},${ty(g.elev)}`).join(' ');
-    // Fill below ground
+    const sgnd=[...S.gnd].sort((a,b)=>a.sta-b.sta);
+    const pts=sgnd.map(g=>`${tx(g.sta)},${ty(g.elev)}`).join(' ');
     const fi=[
-      `${tx(sta(0))},${M.t+ph}`,
-      ...S.gnd.map((g,i)=>`${tx(sta(i))},${ty(g.elev)}`),
-      `${tx(sta(S.gnd.length-1))},${M.t+ph}`
+      `${tx(sgnd[0].sta)},${M.t+ph}`,
+      ...sgnd.map(g=>`${tx(g.sta)},${ty(g.elev)}`),
+      `${tx(sgnd[sgnd.length-1].sta)},${M.t+ph}`
     ].join(' ');
     gc.appendChild(mk('polygon',{points:fi,fill:'rgba(100,140,70,.09)',stroke:'none'}));
-    gc.appendChild(mk('polyline',{points:pts,fill:'none',stroke:'#5a8a3c','stroke-width':2,'stroke-dasharray':'7 3'}));
-    // Ground label
-    gl.appendChild(mk('text',{x:tx(sta(0))+6,y:ty(S.gnd[0].elev)+10,'font-size':9,fill:'#5a8a3c'},'GND'));
+    gc.appendChild(mk('path',{d:catmullRomPath(sgnd,tx,ty),fill:'none',stroke:'#000','stroke-width':2}));
+    gl.appendChild(mk('text',{x:tx(sgnd[0].sta)+6,y:ty(sgnd[0].elev)+10,'font-size':9,fill:'#000'},'ST'));
+  }
+
+  // Ground spline
+  if(S.showGround && S.ground.length>1){
+    const sorted=[...S.ground].sort((a,b)=>a.sta-b.sta);
+    const ext=U.isImp()?5:1.5;
+    const n=sorted.length;
+    const sl0=sorted[1].sta>sorted[0].sta?(sorted[1].elev-sorted[0].elev)/(sorted[1].sta-sorted[0].sta):0;
+    const sln=sorted[n-1].sta>sorted[n-2].sta?(sorted[n-1].elev-sorted[n-2].elev)/(sorted[n-1].sta-sorted[n-2].sta):0;
+    const extended=[
+      {sta:sorted[0].sta-ext, elev:sorted[0].elev-sl0*ext},
+      ...sorted,
+      {sta:sorted[n-1].sta+ext, elev:sorted[n-1].elev+sln*ext}
+    ];
+    gc.appendChild(mk('path',{d:catmullRomPath(extended,tx,ty),fill:'none',stroke:'#7a5c2e','stroke-width':2}));
+    gl.appendChild(mk('text',{x:tx(extended[0].sta)+6,y:ty(extended[0].elev)+10,'font-size':9,fill:'#7a5c2e'},'GND'));
   }
 
   // Street crossings
@@ -402,9 +436,10 @@ const TAB_DEF=[
   {id:'mh',label:'Manholes'},
   {id:'pipe',label:'Pipes'},
   {id:'street',label:'Streets'},
-  {id:'gnd',label:'Ground Elev',flag:'showGnd'},
+  {id:'gnd',label:'Street Surface',flag:'showGnd'},
   {id:'hgl',label:'HGL',flag:'showHGL'},
   {id:'bsmt',label:'Basements',flag:'showBsmt'},
+  {id:'ground',label:'Ground',flag:'showGround'},
 ];
 
 function buildTabs(){
@@ -430,7 +465,7 @@ function showTab(id){
     b.classList.toggle('on',b.dataset.id===id);
   });
   const body=document.getElementById('tab-body');
-  const renderers={mh:tblMH,pipe:tblPipe,street:tblStreet,gnd:tblGnd,hgl:tblHGL,bsmt:tblBsmt};
+  const renderers={mh:tblMH,pipe:tblPipe,street:tblStreet,gnd:tblGnd,hgl:tblHGL,bsmt:tblBsmt,ground:tblGround};
   body.innerHTML=(renderers[id]||tblMH)();
 }
 
@@ -517,19 +552,48 @@ function tblStreet(){
   return h+'</tbody></table>';
 }
 
-// ─── Ground table ─────────────────────────────────────────────────────────────
+// ─── Street surface table ─────────────────────────────────────────────────────
+function addGndRow(){S.gnd.push({sta:totalLen()/2,elev:U.defElev()});showTab('gnd');redraw()}
+function delGndRow(i){S.gnd.splice(i,1);showTab('gnd');redraw()}
 function tblGnd(){
   const eu=U.eu(),lu=U.lu();
   let h=`<table><thead><tr>
-    <th>At MH</th><th>Station (${lu})</th><th>Ground Elev (${eu})</th>
+    <th>#</th><th>Station (${lu})</th><th>Street Elev (${eu})</th><th></th>
   </tr></thead><tbody>`;
   S.gnd.forEach((g,i)=>{
     h+=`<tr>
-      <td class="lbl">${esc(S.mh[i]?.name||'MH-'+(i+1))}</td>
-      <td class="ro">${U.fmt(sta(i),2)}</td>
+      <td class="ro">${i+1}</td>
+      <td>${ni(g.sta,`v=>{S.gnd[${i}].sta=v;redraw()}`,0)}</td>
       <td>${ni(g.elev,`v=>{S.gnd[${i}].elev=v;redraw()}`)}</td>
+      <td><button onclick="delGndRow(${i})">×</button></td>
     </tr>`;
   });
+  h+=`<tr><td colspan="4" style="padding:6px 8px">
+    <button onclick="addGndRow()">+ Add point</button>
+  </td></tr>`;
+  return h+'</tbody></table>';
+}
+
+// ─── Ground spline table ──────────────────────────────────────────────────────
+function addGroundRow(){S.ground.push({sta:totalLen()/2,elev:U.defElev()});showTab('ground');redraw()}
+function delGroundRow(i){S.ground.splice(i,1);showTab('ground');redraw()}
+function tblGround(){
+  if(!S.ground.length)return'<p class="empty">No ground points. Add a point below.</p>';
+  const eu=U.eu(),lu=U.lu();
+  let h=`<table><thead><tr>
+    <th>#</th><th>Station (${lu})</th><th>Ground Elev (${eu})</th><th></th>
+  </tr></thead><tbody>`;
+  S.ground.forEach((g,i)=>{
+    h+=`<tr>
+      <td class="ro">${i+1}</td>
+      <td>${ni(g.sta,`v=>{S.ground[${i}].sta=v;redraw()}`,0)}</td>
+      <td>${ni(g.elev,`v=>{S.ground[${i}].elev=v;redraw()}`)}</td>
+      <td><button onclick="delGroundRow(${i})">×</button></td>
+    </tr>`;
+  });
+  h+=`<tr><td colspan="4" style="padding:6px 8px">
+    <button onclick="addGroundRow()">+ Add point</button>
+  </td></tr>`;
   return h+'</tbody></table>';
 }
 
