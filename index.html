@@ -677,7 +677,14 @@ async function doExport(type){
 
   if(type==='svg'){
     const svg=document.getElementById('profile-svg');
+    const W=svg.clientWidth, H=svg.clientHeight;
+    svg.setAttribute('width',W);
+    svg.setAttribute('height',H);
+    svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
     const data=new XMLSerializer().serializeToString(svg);
+    svg.removeAttribute('width');
+    svg.removeAttribute('height');
+    svg.removeAttribute('viewBox');
     dlBlob(new Blob([data],{type:'image/svg+xml'}),'pipe-profile.svg');
     return;
   }
