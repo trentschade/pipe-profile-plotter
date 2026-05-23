@@ -189,7 +189,8 @@ function boot(){
   S.hgl=S.mh.map(m=>({elev:+(m.inv+ro*0.5).toFixed(3)}));
   S.bsmt=Array.from({length:nBsmt},(_,i)=>{
     const s=Math.round(((i+0.5)/nBsmt)*nPipe*len);
-    return{name:`House ${i+1}`,sta:s};
+    const elev=+(groundAtSta(s)+U.bsmtAbove()).toFixed(3);
+    return{name:`House ${i+1}`,sta:s,elev};
   });
 
   document.getElementById('setup-screen').style.display='none';
@@ -295,12 +296,11 @@ function redraw(){
 
   // Basements
   if(S.showBsmt){
-    const above=U.bsmtAbove(), depth=U.bsmtDepth();
+    const depth=U.bsmtDepth();
     S.bsmt.forEach(b=>{
       const x=tx(+b.sta||0);
-      const gElev=groundAtSta(+b.sta||0);
-      const houseBottomY=ty(gElev+above);
-      const lineEndY=ty(gElev+above-depth);
+      const houseBottomY=ty(+b.elev||0);
+      const lineEndY=ty((+b.elev||0)-depth);
       const hw=10, bh=8, rh=6;
       // Dotted depth line (drawn first, beneath house)
       gc.appendChild(mk('line',{x1:x,y1:houseBottomY,x2:x,y2:lineEndY,stroke:'#1a3a5c','stroke-width':1,'stroke-dasharray':'3 3'}));
@@ -533,13 +533,14 @@ function tblHGL(){
 // ─── Basement table ───────────────────────────────────────────────────────────
 function tblBsmt(){
   if(!S.bsmt.length)return'<p class="empty">No basements configured. Start a new profile to add basements.</p>';
-  const lu=U.lu();
-  let h=`<table><thead><tr><th>#</th><th>Name</th><th>Station (${lu})</th></tr></thead><tbody>`;
+  const lu=U.lu(), eu=U.eu();
+  let h=`<table><thead><tr><th>#</th><th>Name</th><th>Station (${lu})</th><th>House Elev (${eu})</th></tr></thead><tbody>`;
   S.bsmt.forEach((b,i)=>{
     h+=`<tr>
       <td class="ro">${i+1}</td>
       <td>${ti(b.name,`v=>{S.bsmt[${i}].name=v;redraw()}`)}</td>
       <td>${ni(b.sta,`v=>{S.bsmt[${i}].sta=v;redraw()}`,0)}</td>
+      <td>${ni(b.elev,`v=>{S.bsmt[${i}].elev=v;redraw()}`)}</td>
     </tr>`;
   });
   return h+'</tbody></table>';
