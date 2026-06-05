@@ -134,7 +134,7 @@ td input:focus{outline:none;border-color:#1a3a5c;background:#fff}
 const S = {
   units:'imp', showGnd:true, showBsmt:false, showHGL:false, showGround:false,
   mh:[],      // {name, rim, inv}
-  pipe:[],    // {len, dia, mat}
+  pipe:[],    // {len, dia, mat, us_inv, ds_inv}
   street:[],  // {name, sta}
   gnd:[],     // street surface {sta, elev}
   hgl:[],     // {elev}
@@ -181,7 +181,7 @@ function boot(){
     const inv=+(e0-i*sl*len).toFixed(3);
     return{name:`MH-${i+1}`,rim:+(inv+ro).toFixed(3),inv};
   });
-  S.pipe=Array.from({length:nPipe},()=>({len:len,dia:U.defDia(),mat:'PVC'}));
+  S.pipe=Array.from({length:nPipe},(_,i)=>({len:len,dia:U.defDia(),mat:'PVC',us_inv:S.mh[i].inv,ds_inv:S.mh[i+1].inv}));
   S.street=Array.from({length:nSt},(_,i)=>{
     const s=Math.round((i/nSt)*nPipe*len);
     return{name:`Street ${i+1}`,sta:s};
@@ -269,17 +269,12 @@ function redraw(){
     return el;
   }
 
-  // Defs + clip
-  const defs=mk('defs');
-  const cp=mk('clipPath',{id:'cp'});
-  cp.appendChild(mk('rect',{x:M.l,y:M.t,width:pw,height:ph}));
-  defs.appendChild(cp); svg.appendChild(defs);
-
   // Background
   svg.appendChild(mk('rect',{x:0,y:0,width:W,height:H,fill:'#fafbfc'}));
   svg.appendChild(mk('rect',{x:M.l,y:M.t,width:pw,height:ph,fill:'#fff',stroke:'#c8d4df','stroke-width':1}));
 
-  const gc=mk('g',{'clip-path':'url(#cp)'});
+  // Nested svg viewport clips content without using clipPath (broader viewer support)
+  const gc=mk('svg',{x:M.l,y:M.t,width:pw,height:ph,viewBox:`${M.l} ${M.t} ${pw} ${ph}`,overflow:'hidden'});
   const gl=mk('g'); // labels (unclipped)
   svg.appendChild(gc); svg.appendChild(gl);
 
@@ -375,17 +370,17 @@ function redraw(){
     const mu=S.mh[i], md=S.mh[i+1];
     if(!mu||!md)return;
     const x1=tx(sta(i)), x2=tx(sta(i+1));
-    const y1=ty(mu.inv), y2=ty(md.inv);
-    // Top of pipe line offset by diameter in elevation units
+    const ui=p.us_inv??mu.inv, di=p.ds_inv??md.inv;
+    const y1=ty(ui), y2=ty(di);
     const diaElev=U.isImp()?(+p.dia||0)/12:(+p.dia||0)/1000;
-    const y1t=ty(mu.inv+diaElev), y2t=ty(md.inv+diaElev);
+    const y1t=ty(ui+diaElev), y2t=ty(di+diaElev);
     gc.appendChild(mk('polygon',{points:`${x1},${y1} ${x2},${y2} ${x2},${y2t} ${x1},${y1t}`,fill:'#cdd9e8',stroke:'none'}));
     gc.appendChild(mk('line',{x1,y1,x2,y2,stroke:'#1a3a5c','stroke-width':1,'stroke-linecap':'butt'}));
     gc.appendChild(mk('line',{x1,y1:y1t,x2,y2:y2t,stroke:'#1a3a5c','stroke-width':1,'stroke-linecap':'butt'}));
 
     // Pipe label box
     const mx=(x1+x2)/2, my=(y1+y2)/2;
-    const slope=+p.len>0?((mu.inv-md.inv)/+p.len*100):0;
+    const slope=+p.len>0?((ui-di)/+p.len*100):0;
     const line1=`${p.dia} ${U.du()} ${p.mat||''}`.trim();
     const line2=`S=${slope>=0?'':'-'}${Math.abs(slope).toFixed(2)}%`;
     const lw=Math.max(line1.length,line2.length)*5.6+8;
@@ -495,7 +490,7 @@ function tblMH(){
       <td class="lbl">MH-${i+1}</td>
       <td>${ti(m.name,`v=>{S.mh[${i}].name=v;redraw()}`)}</td>
       <td>${ni(m.rim,`v=>{S.mh[${i}].rim=v;updDepth(${i});redraw()}`)}</td>
-      <td>${ni(m.inv,`v=>{S.mh[${i}].inv=v;updDepth(${i});updSlope(${i-1});updSlope(${i});redraw()}`)}</td>
+      <td><input type="number" step="any" value="${(+m.inv).toFixed(2)}" oninput="S.mh[${i}].inv=+this.value;updDepth(${i});updSlope(${i-1});updSlope(${i});redraw()" onchange="checkMhInv(this,${i})"></td>
       <td class="ro" id="dep-${i}">${dep}</td>
       <td class="ro">${U.fmt(sta(i),2)}</td>
     </tr>`;
@@ -511,7 +506,49 @@ function updSlope(i){
   const c=document.getElementById('sl-'+i);
   if(!c)return;
   const p=S.pipe[i],mu=S.mh[i],md=S.mh[i+1];
-  if(p&&mu&&md&&+p.len>0)c.textContent=((mu.inv-md.inv)/+p.len*100).toFixed(3);
+  if(p&&mu&&md&&+p.len>0){
+    const ui=p.us_inv??mu.inv, di=p.ds_inv??md.inv;
+    c.textContent=((ui-di)/+p.len*100).toFixed(3);
+  }
+}
+function lowestPipeInv(i){
+  const invs=[];
+  if(S.pipe[i-1]) invs.push(+(S.pipe[i-1].ds_inv??S.mh[i].inv));
+  if(S.pipe[i])   invs.push(+(S.pipe[i].us_inv??S.mh[i].inv));
+  return invs.length?Math.min(...invs):null;
+}
+function checkMhInv(el,i){
+  const mh=S.mh[i];
+  const low=lowestPipeInv(i);
+  if(low!==null&&+mh.inv>+low){
+    alert(`${mh.name} invert (${U.fmt(mh.inv)}) cannot be above the lowest connecting pipe invert (${U.fmt(low)}).`);
+    mh.inv=low;
+    el.value=(+low).toFixed(2);
+    updDepth(i);
+    updSlope(i-1);
+    updSlope(i);
+    redraw();
+  }
+}
+function checkPipeInv(el,i,side){
+  const p=S.pipe[i];
+  const isUs=side==='us';
+  const mhIdx=isUs?i:i+1;
+  const mh=S.mh[mhIdx];
+  const v=isUs?p.us_inv:p.ds_inv;
+  if(+v<+mh.inv){
+    const pipeName=`P-${i+1} ${isUs?'upstream':'downstream'}`;
+    if(confirm(`${pipeName} invert (${U.fmt(+v)}) is below ${mh.name} invert (${U.fmt(mh.inv)}).\nLower ${mh.name} invert to ${U.fmt(+v)}?`)){
+      mh.inv=+v;
+      updDepth(mhIdx);
+      updSlope(mhIdx-1);
+      updSlope(mhIdx);
+    }else{
+      if(isUs)p.us_inv=mh.inv; else p.ds_inv=mh.inv;
+      el.value=(+mh.inv).toFixed(2);
+    }
+  }
+  redraw();
 }
 
 // ─── Pipe table ───────────────────────────────────────────────────────────────
@@ -524,15 +561,18 @@ function tblPipe(){
   </tr></thead><tbody>`;
   S.pipe.forEach((p,i)=>{
     const mu=S.mh[i],md=S.mh[i+1];
-    const sl=+p.len>0&&mu&&md?(((+mu.inv||0)-(+md.inv||0))/(+p.len)*100).toFixed(3):'—';
+    const usInv=p.us_inv??mu?.inv, dsInv=p.ds_inv??md?.inv;
+    const sl=+p.len>0&&mu&&md?(((+(usInv||0))-(+(dsInv||0)))/(+p.len)*100).toFixed(3):'—';
+    const usV=usInv==null||isNaN(+usInv)?'':(+usInv).toFixed(2);
+    const dsV=dsInv==null||isNaN(+dsInv)?'':(+dsInv).toFixed(2);
     h+=`<tr>
       <td class="lbl">P-${i+1}</td>
       <td class="ro">${esc(mu?.name||'MH-'+(i+1))} → ${esc(md?.name||'MH-'+(i+2))}</td>
       <td>${ni(p.len,`v=>{S.pipe[${i}].len=v;redraw()}`,0)}</td>
       <td>${ni(p.dia,`v=>{S.pipe[${i}].dia=v;redraw()}`,0)}</td>
       <td>${ti(p.mat,`v=>{S.pipe[${i}].mat=v;redraw()}`)}</td>
-      <td>${ni(mu?.inv,`v=>{S.mh[${i}].inv=v;updDepth(${i});updSlope(${i});redraw()}`)}</td>
-      <td>${ni(md?.inv,`v=>{S.mh[${i+1}].inv=v;updDepth(${i+1});updSlope(${i});redraw()}`)}</td>
+      <td><input type="number" step="any" value="${usV}" oninput="S.pipe[${i}].us_inv=+this.value;updSlope(${i});redraw()" onchange="checkPipeInv(this,${i},'us')"></td>
+      <td><input type="number" step="any" value="${dsV}" oninput="S.pipe[${i}].ds_inv=+this.value;updSlope(${i});redraw()" onchange="checkPipeInv(this,${i},'ds')"></td>
       <td class="ro" id="sl-${i}">${sl}</td>
     </tr>`;
   });
