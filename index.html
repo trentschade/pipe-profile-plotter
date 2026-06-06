@@ -558,13 +558,55 @@ function checkPipeInv(el,i,side){
   redraw();
 }
 
+// ─── Add / remove pipes ───────────────────────────────────────────────────────
+function addPipe(){
+  const last=S.pipe[S.pipe.length-1];
+  const lastMH=S.mh[S.mh.length-1];
+  const newDsInv=+(+(last.ds_inv??lastMH.inv)-(+(last.us_inv??S.mh[S.mh.length-2].inv)-+(last.ds_inv??lastMH.inv))).toFixed(3);
+  const depth=+(lastMH.rim-lastMH.inv).toFixed(3);
+  const newMH={name:`MH-${S.mh.length+1}`,inv:newDsInv,rim:+(newDsInv+depth).toFixed(3)};
+  S.pipe.push({len:last.len,dia:last.dia,mat:last.mat,us_inv:+(last.ds_inv??lastMH.inv),ds_inv:newDsInv});
+  S.mh.push(newMH);
+  if(S.showHGL&&S.hgl.length>=2){
+    const d=S.hgl[S.hgl.length-1].elev-S.hgl[S.hgl.length-2].elev;
+    S.hgl.push({elev:+(S.hgl[S.hgl.length-1].elev+d).toFixed(3)});
+  } else if(S.showHGL){
+    S.hgl.push({elev:newMH.inv});
+  }
+  const newSta=sta(S.mh.length-1);
+  if(S.showGnd&&S.gnd.length>0){
+    const a=S.gnd[S.gnd.length-(S.gnd.length>=2?2:1)],b=S.gnd[S.gnd.length-1];
+    const slope=b.sta!==a.sta?(b.elev-a.elev)/(b.sta-a.sta):0;
+    S.gnd.push({sta:newSta,elev:+(b.elev+slope*(newSta-b.sta)).toFixed(3)});
+  }
+  if(S.showGround&&S.ground.length>0){
+    const sorted=[...S.ground].sort((a,b)=>a.sta-b.sta);
+    const a=sorted[sorted.length-(sorted.length>=2?2:1)],b=sorted[sorted.length-1];
+    const slope=b.sta!==a.sta?(b.elev-a.elev)/(b.sta-a.sta):0;
+    S.ground.push({sta:newSta,elev:+(b.elev+slope*(newSta-b.sta)).toFixed(3)});
+  }
+  showTab('pipe'); redraw();
+}
+
+function removePipe(){
+  if(S.pipe.length<=1)return;
+  const removedSta=sta(S.mh.length-1);
+  S.pipe.pop();
+  S.mh.pop();
+  if(S.hgl.length>S.mh.length) S.hgl.pop();
+  if(S.gnd.length&&S.gnd[S.gnd.length-1].sta===removedSta) S.gnd.pop();
+  if(S.ground.length&&S.ground[S.ground.length-1].sta===removedSta) S.ground.pop();
+  showTab('pipe'); redraw();
+}
+
 // ─── Pipe table ───────────────────────────────────────────────────────────────
 function tblPipe(){
   const eu=U.eu(),lu=U.lu(),du=U.du();
+  const last=S.pipe.length-1;
   let h=`<table><thead><tr>
     <th>Pipe</th><th>From → To</th>
     <th>Length (${lu})</th><th>Dia (${du})</th><th>Material</th>
-    <th>Up Inv (${eu})</th><th>Dn Inv (${eu})</th><th>Slope (%)</th>
+    <th>Up Inv (${eu})</th><th>Dn Inv (${eu})</th><th>Slope (%)</th><th></th>
   </tr></thead><tbody>`;
   S.pipe.forEach((p,i)=>{
     const mu=S.mh[i],md=S.mh[i+1];
@@ -572,6 +614,7 @@ function tblPipe(){
     const sl=+p.len>0&&mu&&md?(((+(usInv||0))-(+(dsInv||0)))/(+p.len)*100).toFixed(3):'—';
     const usV=usInv==null||isNaN(+usInv)?'':(+usInv).toFixed(2);
     const dsV=dsInv==null||isNaN(+dsInv)?'':(+dsInv).toFixed(2);
+    const delBtn=i===last&&S.pipe.length>1?`<button onclick="removePipe()">×</button>`:'';
     h+=`<tr>
       <td class="lbl">P-${i+1}</td>
       <td class="ro">${esc(mu?.name||'MH-'+(i+1))} → ${esc(md?.name||'MH-'+(i+2))}</td>
@@ -581,8 +624,12 @@ function tblPipe(){
       <td><input type="number" step="any" value="${usV}" oninput="S.pipe[${i}].us_inv=+this.value;updSlope(${i});redraw()" onchange="checkPipeInv(this,${i},'us')"></td>
       <td><input type="number" step="any" value="${dsV}" oninput="S.pipe[${i}].ds_inv=+this.value;updSlope(${i});redraw()" onchange="checkPipeInv(this,${i},'ds')"></td>
       <td class="ro" id="sl-${i}">${sl}</td>
+      <td>${delBtn}</td>
     </tr>`;
   });
+  h+=`<tr><td colspan="9" style="padding:6px 8px">
+    <button onclick="addPipe()">+ Add Pipe</button>
+  </td></tr>`;
   return h+'</tbody></table>';
 }
 
