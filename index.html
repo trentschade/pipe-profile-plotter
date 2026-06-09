@@ -95,8 +95,9 @@ td input:focus{outline:none;border-color:#1a3a5c;background:#fff}
       </div>
     </div>
 
-    <button class="btn-go" onclick="boot()">Generate Profile →</button>
-    <button class="btn-load" onclick="triggerLoad()">Load existing profile (JSON)</button>
+    <button class="btn-go" onclick="boot()">Generate New Profile →</button>
+    <div id="resume-wrap"></div>
+    <button class="btn-load" onclick="triggerLoad()">Load Existing Profile (JSON)</button>
   </div>
 </div>
 
@@ -427,6 +428,7 @@ function redraw(){
   const eal=mk('text',{x:11,y:M.t+ph/2,'text-anchor':'middle','font-size':11,fill:'#555',
     transform:`rotate(-90,11,${M.t+ph/2})`},`Elevation (${U.eu()})`);
   gl.appendChild(eal);
+  saveLocal();
 }
 
 function niceStep(r){
@@ -855,6 +857,39 @@ function loadJSON(input){
   };
   reader.readAsText(file);
 }
+
+// ─── localStorage auto-save ───────────────────────────────────────────────────
+const LS_KEY='pipeProfile';
+
+function saveLocal(){
+  try{localStorage.setItem(LS_KEY,JSON.stringify({version:1,...S}));}catch(e){}
+}
+
+function initFromLocal(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(!raw)return;
+    const parsed=JSON.parse(raw);
+    const required=['mh','pipe','street','gnd','hgl','bsmt','ground','units'];
+    if(!required.every(k=>k in parsed))return;
+    const btn=document.createElement('button');
+    btn.className='btn-go';
+    btn.style.cssText='background:#2e7d32';
+    btn.textContent='Resume Last Profile →';
+    btn.onclick=()=>{
+      Object.assign(S,parsed);
+      document.getElementById('setup-screen').style.display='none';
+      document.getElementById('main-screen').style.display='flex';
+      document.getElementById('u-imp').classList.toggle('on',S.units==='imp');
+      document.getElementById('u-met').classList.toggle('on',S.units==='met');
+      buildTabs(); showTab('mh'); redraw();
+      window.addEventListener('resize',redraw);
+    };
+    document.getElementById('resume-wrap').appendChild(btn);
+  }catch(e){}
+}
+
+initFromLocal();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 </body>
