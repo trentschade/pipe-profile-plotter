@@ -145,7 +145,7 @@ const S = {
   pipe:[],    // {len, dia, mat, us_inv, ds_inv}
   street:[],  // {name, sta}
   gnd:[],     // street surface {sta, elev}
-  hgl:[],     // {elev}
+  hgls:[],    // [{name, pts:[{elev}]}]
   bsmt:[],    // {name, sta, elev}
   ground:[],  // ground spline {sta, elev}
 };
@@ -195,7 +195,7 @@ function boot(){
     return{name:`Street ${i+1}`,sta:s};
   });
   S.gnd=S.mh.map((m,i)=>({sta:sta(i),elev:+m.rim.toFixed(3)}));
-  S.hgl=S.mh.map(m=>({elev:+(m.inv+ro*0.5).toFixed(3)}));
+  S.hgls=S.showHGL?[{name:'HGL 1',pts:S.mh.map(m=>({elev:+(m.inv+ro*0.5).toFixed(3)}))}]:[];
   S.bsmt=Array.from({length:nBsmt},(_,i)=>{
     const s=Math.round(((i+0.5)/nBsmt)*nPipe*len);
     const randAbove=U.isImp()?8+Math.random()*2:2.4+Math.random()*0.6;
@@ -259,7 +259,7 @@ function redraw(){
   const ev=[];
   S.mh.forEach(m=>{ev.push(m.rim,m.inv)});
   if(S.showGnd) S.gnd.forEach(g=>ev.push(g.elev));
-  if(S.showHGL) S.hgl.forEach(h=>ev.push(h.elev));
+  if(S.showHGL) S.hgls.forEach(l=>l.pts.forEach(h=>ev.push(h.elev)));
   if(S.showBsmt) S.bsmt.forEach(b=>{ev.push(+b.elev||0);ev.push((+b.elev||0)-U.bsmtDepth())});
   if(S.showGround) S.ground.forEach(g=>ev.push(g.elev));
   let emin=Math.min(...ev), emax=Math.max(...ev);
@@ -366,11 +366,15 @@ function redraw(){
     });
   }
 
-  // HGL
-  if(S.showHGL && S.hgl.length>1){
-    const pts=S.hgl.map((h,i)=>`${tx(sta(i))},${ty(h.elev)}`).join(' ');
-    gc.appendChild(mk('polyline',{points:pts,fill:'none',stroke:'#1565c0','stroke-width':2,'stroke-dasharray':'10 4'}));
-    gl.appendChild(mk('text',{x:M.l+4,y:ty(S.hgl[0].elev)-4,'font-size':9,fill:'#1565c0'},'HGL'));
+  // HGLs
+  if(S.showHGL){
+    S.hgls.forEach((line,li)=>{
+      if(line.pts.length<2)return;
+      const col=HGL_COLORS[li%HGL_COLORS.length];
+      const pts=line.pts.map((h,i)=>`${tx(sta(i))},${ty(h.elev)}`).join(' ');
+      gc.appendChild(mk('polyline',{points:pts,fill:'none',stroke:col,'stroke-width':2,'stroke-dasharray':'10 4'}));
+      gl.appendChild(mk('text',{x:M.l+4,y:ty(line.pts[0].elev)-4-li*11,'font-size':9,fill:col},line.name));
+    });
   }
 
   // Pipes
@@ -569,12 +573,14 @@ function addPipe(){
   const newMH={name:`MH-${S.mh.length+1}`,inv:newDsInv,rim:+(newDsInv+depth).toFixed(3)};
   S.pipe.push({len:last.len,dia:last.dia,mat:last.mat,us_inv:+(last.ds_inv??lastMH.inv),ds_inv:newDsInv});
   S.mh.push(newMH);
-  if(S.showHGL&&S.hgl.length>=2){
-    const d=S.hgl[S.hgl.length-1].elev-S.hgl[S.hgl.length-2].elev;
-    S.hgl.push({elev:+(S.hgl[S.hgl.length-1].elev+d).toFixed(3)});
-  } else if(S.showHGL){
-    S.hgl.push({elev:newMH.inv});
-  }
+  S.hgls.forEach(line=>{
+    if(line.pts.length>=2){
+      const d=line.pts[line.pts.length-1].elev-line.pts[line.pts.length-2].elev;
+      line.pts.push({elev:+(line.pts[line.pts.length-1].elev+d).toFixed(3)});
+    } else {
+      line.pts.push({elev:newMH.inv});
+    }
+  });
   const newSta=sta(S.mh.length-1);
   if(S.showGnd&&S.gnd.length>0){
     const a=S.gnd[S.gnd.length-(S.gnd.length>=2?2:1)],b=S.gnd[S.gnd.length-1];
@@ -595,7 +601,7 @@ function removePipe(){
   const removedSta=sta(S.mh.length-1);
   S.pipe.pop();
   S.mh.pop();
-  if(S.hgl.length>S.mh.length) S.hgl.pop();
+  S.hgls.forEach(line=>{if(line.pts.length>S.mh.length)line.pts.pop()});
   if(S.gnd.length&&S.gnd[S.gnd.length-1].sta===removedSta) S.gnd.pop();
   if(S.ground.length&&S.ground[S.ground.length-1].sta===removedSta) S.ground.pop();
   showTab('pipe'); redraw();
@@ -695,18 +701,48 @@ function tblGround(){
   return h+'</tbody></table>';
 }
 
+// ─── HGL colors / add / remove ───────────────────────────────────────────────
+const HGL_COLORS=['#1565c0','#c62828','#e65100','#2e7d32','#6a1b9a','#00838f'];
+
+function addHGL(){
+  const ro=U.rimOff();
+  S.hgls.push({name:`HGL ${S.hgls.length+1}`,pts:S.mh.map(m=>({elev:+(m.inv+ro*0.5).toFixed(3)}))});
+  if(!S.showHGL){S.showHGL=true;buildTabs();}
+  showTab('hgl'); redraw();
+}
+
+function removeHGL(li){
+  S.hgls.splice(li,1);
+  if(!S.hgls.length) S.showHGL=false;
+  buildTabs(); showTab(S.hgls.length?'hgl':'mh'); redraw();
+}
+
 // ─── HGL table ────────────────────────────────────────────────────────────────
 function tblHGL(){
   const eu=U.eu();
-  let h=`<table><thead><tr><th>MH</th><th>Name</th><th>HGL Elev (${eu})</th></tr></thead><tbody>`;
-  S.hgl.forEach((h2,i)=>{
-    h+=`<tr>
-      <td class="lbl">MH-${i+1}</td>
-      <td class="ro">${esc(S.mh[i]?.name||'')}</td>
-      <td>${ni(h2.elev,`v=>{S.hgl[${i}].elev=v;redraw()}`)}</td>
-    </tr>`;
+  let h='';
+  S.hgls.forEach((line,li)=>{
+    const col=HGL_COLORS[li%HGL_COLORS.length];
+    const delBtn=S.hgls.length>1
+      ?`<button onclick="removeHGL(${li})" style="float:right;margin-top:-1px">×</button>`:'';
+    h+=`<div style="padding:6px 10px 2px;background:#f5f7fa;border-bottom:1px solid #c8d4df;display:flex;align-items:center;gap:8px">
+      <span style="display:inline-block;width:20px;height:3px;background:${col};border-radius:2px;flex-shrink:0"></span>
+      <input type="text" value="${esc(line.name)}" oninput="S.hgls[${li}].name=this.value;redraw()"
+        style="flex:1;border:none;background:transparent;font-weight:600;font-size:13px;color:#333;padding:0">
+      ${delBtn}
+    </div>`;
+    h+=`<table><thead><tr><th>MH</th><th>Name</th><th>HGL Elev (${eu})</th></tr></thead><tbody>`;
+    line.pts.forEach((pt,i)=>{
+      h+=`<tr>
+        <td class="lbl">MH-${i+1}</td>
+        <td class="ro">${esc(S.mh[i]?.name||'')}</td>
+        <td>${ni(pt.elev,`v=>{S.hgls[${li}].pts[${i}].elev=v;redraw()}`)}</td>
+      </tr>`;
+    });
+    h+='</tbody></table>';
   });
-  return h+'</tbody></table>';
+  h+=`<div style="padding:6px 10px"><button onclick="addHGL()">+ Add HGL</button></div>`;
+  return h;
 }
 
 // ─── Basement table ───────────────────────────────────────────────────────────
@@ -837,6 +873,12 @@ function triggerLoad(){
   document.getElementById('json-file-in').click();
 }
 
+function migrateProfile(p){
+  if(!p.hgls&&p.hgl) p.hgls=p.hgl.length?[{name:'HGL 1',pts:p.hgl}]:[];
+  delete p.hgl;
+  if(!p.showHGL) p.showHGL=p.hgls&&p.hgls.length>0;
+}
+
 function loadJSON(input){
   const file=input.files[0];
   if(!file)return;
@@ -845,8 +887,10 @@ function loadJSON(input){
     let parsed;
     try{parsed=JSON.parse(e.target.result)}
     catch{alert('Invalid JSON file.');return}
-    const required=['mh','pipe','street','gnd','hgl','bsmt','ground','units'];
-    if(!required.every(k=>k in parsed)){alert('File does not appear to be a valid pipe profile JSON.');return}
+    const required=['mh','pipe','street','gnd','bsmt','ground','units'];
+    if(!required.every(k=>k in parsed)||(!('hgl' in parsed)&&!('hgls' in parsed))){
+      alert('File does not appear to be a valid pipe profile JSON.');return}
+    migrateProfile(parsed);
     Object.assign(S,parsed);
     document.getElementById('setup-screen').style.display='none';
     document.getElementById('main-screen').style.display='flex';
@@ -870,8 +914,9 @@ function initFromLocal(){
     const raw=localStorage.getItem(LS_KEY);
     if(!raw)return;
     const parsed=JSON.parse(raw);
-    const required=['mh','pipe','street','gnd','hgl','bsmt','ground','units'];
-    if(!required.every(k=>k in parsed))return;
+    const required=['mh','pipe','street','gnd','bsmt','ground','units'];
+    if(!required.every(k=>k in parsed)||(!('hgl' in parsed)&&!('hgls' in parsed)))return;
+    migrateProfile(parsed);
     const btn=document.createElement('button');
     btn.className='btn-go';
     btn.style.cssText='background:#2e7d32';
