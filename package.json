@@ -1,0 +1,29 @@
+{
+  "name": "pipe_profile_b123",
+  "version": "1.0.0",
+  "description": "An interactive browser-based tool for generating pipe profile drawings — the kind used in civil/municipal engineering to show underground pipe systems in elevation view.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trentschade/pipe-profile-plotter.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/trentschade/pipe-profile-plotter/issues"
+  },
+  "homepage": "https://github.com/trentschade/pipe-profile-plotter#readme",
+  "devDependencies": {
+    "terser": "^5.48.0",
+    "vite": "^8.1.0"
+  },
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}
