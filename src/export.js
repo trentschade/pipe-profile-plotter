@@ -3,6 +3,8 @@ import { S } from './state.js';
 import { redraw } from './drawing.js';
 import { buildTabs, showTab } from './tables.js';
 import { migrateProfile } from './persist.js';
+import { isPremium } from './auth.js';
+import { requirePremium } from './gating.js';
 
 export function toggleExp(e){
   e.stopPropagation();
@@ -79,7 +81,10 @@ export function loadJSON(input){
 export async function doExport(type){
   document.getElementById('exp-dd').hidden=true;
 
-  if(type==='json'){saveJSON();return}
+  if(type==='json'){
+    requirePremium('Save JSON', ()=> saveJSON());
+    return;
+  }
 
   if(type==='svg'){
     const svg=document.getElementById('profile-svg');

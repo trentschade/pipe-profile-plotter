@@ -51,3 +51,23 @@ td input:focus{outline:none;border-color:#1a3a5c;background:#fff}
 .ro{color:#666;font-size:12px}
 .lbl{font-weight:700;color:#1a3a5c;white-space:nowrap}
 .empty{text-align:center;color:#aaa;padding:20px}
+
+/* ── Auth ── */
+.auth-wrap{position:relative}
+.auth-dd{position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid #c8d4df;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.15);width:280px;z-index:100;padding:16px}
+.auth-dd h3{font-size:14px;color:#1a3a5c;margin-bottom:12px}
+.auth-dd input{width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;font-size:13px;margin-bottom:8px}
+.auth-dd .auth-err{color:#c62828;font-size:12px;margin-bottom:8px}
+.auth-dd .auth-msg{color:#2e7d32;font-size:12px;margin-bottom:8px}
+.auth-toggle{color:#1a3a5c;font-size:12px;cursor:pointer;text-decoration:underline;margin-top:4px;display:inline-block}
+.auth-user{font-size:11px;color:rgba(255,255,255,.75);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── Upgrade modal ── */
+#upgrade-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:1000}
+.upgrade-modal{background:#fff;border-radius:10px;padding:28px;width:380px;box-shadow:0 6px 32px rgba(0,0,0,.3);text-align:center}
+.upgrade-modal h2{font-size:18px;color:#1a3a5c;margin-bottom:8px}
+.upgrade-modal p{font-size:14px;color:#333;line-height:1.5}
+
+/* ── Gated button ── */
+.gated{opacity:.5;cursor:not-allowed;position:relative}
+.gate-badge{font-size:9px;background:#1a3a5c;color:#fff;padding:1px 5px;border-radius:3px;margin-left:6px;vertical-align:middle}

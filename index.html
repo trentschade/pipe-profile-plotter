@@ -70,6 +70,19 @@
       <button class="hbtn" onclick="triggerLoad()">Load JSON</button>
       <button class="hbtn" onclick="goSetup()">New Profile</button>
       <input type="file" id="json-file-in" accept=".json" style="display:none" onchange="loadJSON(this)">
+      <div class="auth-wrap">
+        <span class="auth-user" id="auth-user-label"></span>
+        <button class="hbtn" id="auth-btn" onclick="toggleAuth(event)">Sign In</button>
+        <div class="auth-dd" id="auth-dd" hidden>
+          <h3 id="auth-title">Sign In</h3>
+          <div class="auth-err" id="auth-err" hidden></div>
+          <div class="auth-msg" id="auth-msg" hidden></div>
+          <input type="email" id="auth-email" placeholder="Email">
+          <input type="password" id="auth-pass" placeholder="Password">
+          <button class="btn-go" style="margin-top:0" onclick="submitAuth()">Sign In</button>
+          <span class="auth-toggle" id="auth-toggle" onclick="flipAuthMode()">Need an account? Sign up</span>
+        </div>
+      </div>
     </div>
   </header>
 

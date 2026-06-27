@@ -5,6 +5,8 @@ import { buildTabs, showTab, updDepth, updSlope, checkMhInv, checkPipeInv,
          addHGL, removeHGL } from './tables.js';
 import { toggleExp, doExport, triggerLoad, loadJSON, saveJSON } from './export.js';
 import { loadLocal } from './persist.js';
+import { initAuth, getUser, signIn, signUp, signOut, setOnAuthChange } from './auth.js';
+import { requirePremium } from './gating.js';
 
 function boot(){
   const nPipe=Math.max(1,Math.min(20,+document.getElementById('s-pipes').value||3));
@@ -78,15 +80,111 @@ function initFromLocal(){
   document.getElementById('resume-wrap').appendChild(btn);
 }
 
+// ─── Auth UI ──────────────────────────────────────────────────────────────────
+let authMode = 'signin';
+
+function updateAuthUI(user){
+  const btn = document.getElementById('auth-btn');
+  const label = document.getElementById('auth-user-label');
+  if(user){
+    btn.textContent = 'Sign Out';
+    label.textContent = user.email;
+  } else {
+    btn.textContent = 'Sign In';
+    label.textContent = '';
+  }
+  document.getElementById('auth-dd').hidden = true;
+}
+
+function toggleAuth(e){
+  e.stopPropagation();
+  const user = getUser();
+  if(user){
+    signOut().then(()=> updateAuthUI(null)).catch(err => alert(err.message));
+    return;
+  }
+  const dd = document.getElementById('auth-dd');
+  dd.hidden = !dd.hidden;
+  if(!dd.hidden){
+    document.getElementById('auth-err').hidden = true;
+    document.getElementById('auth-msg').hidden = true;
+    document.getElementById('auth-email').value = '';
+    document.getElementById('auth-pass').value = '';
+    function close(ev){
+      if(!ev.target.closest('.auth-wrap')){dd.hidden=true;document.removeEventListener('click',close)}
+    }
+    document.addEventListener('click',close);
+  }
+}
+
+function flipAuthMode(){
+  authMode = authMode==='signin' ? 'signup' : 'signin';
+  document.getElementById('auth-title').textContent = authMode==='signin' ? 'Sign In' : 'Sign Up';
+  document.getElementById('auth-toggle').textContent =
+    authMode==='signin' ? 'Need an account? Sign up' : 'Already have an account? Sign in';
+  document.querySelector('#auth-dd .btn-go').textContent = authMode==='signin' ? 'Sign In' : 'Sign Up';
+  document.getElementById('auth-err').hidden = true;
+  document.getElementById('auth-msg').hidden = true;
+}
+
+async function submitAuth(){
+  const email = document.getElementById('auth-email').value.trim();
+  const pass = document.getElementById('auth-pass').value;
+  const errEl = document.getElementById('auth-err');
+  const msgEl = document.getElementById('auth-msg');
+  errEl.hidden = true;
+  msgEl.hidden = true;
+
+  if(!email || !pass){
+    errEl.textContent = 'Email and password are required.';
+    errEl.hidden = false;
+    return;
+  }
+
+  try{
+    if(authMode==='signup'){
+      await signUp(email, pass);
+      msgEl.textContent = 'Check your email to confirm your account.';
+      msgEl.hidden = false;
+    } else {
+      await signIn(email, pass);
+      document.getElementById('auth-dd').hidden = true;
+    }
+  }catch(err){
+    errEl.textContent = err.message;
+    errEl.hidden = false;
+  }
+}
+
+// ─── Gated wrappers ──────────────────────────────────────────────────────────
+function gatedSaveJSON(){
+  requirePremium('Save JSON', ()=> saveJSON());
+}
+
+function gatedTriggerLoad(){
+  requirePremium('Load JSON', ()=> triggerLoad());
+}
+
+setOnAuthChange((user)=>{
+  updateAuthUI(user);
+});
+
 // Expose to inline event handlers in HTML
 Object.assign(window, {
   S, redraw, boot, goSetup, setUnits,
-  toggleExp, doExport, triggerLoad, loadJSON, saveJSON,
+  toggleExp, doExport,
+  triggerLoad: gatedTriggerLoad,
+  loadJSON, saveJSON,
   updDepth, updSlope, checkMhInv, checkPipeInv,
   addPipe, removePipe,
   addGndRow, delGndRow, addGroundRow, delGroundRow,
   addHGL, removeHGL,
   showTab, buildTabs,
+  toggleAuth, flipAuthMode, submitAuth,
 });
 
+// ─── Init ─────────────────────────────────────────────────────────────────────
+initAuth().then(()=>{
+  updateAuthUI(getUser());
+});
 initFromLocal();
